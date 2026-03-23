@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diyar Massive Network (Admin Sürümü)</title>
+    <style>
+        /* PRO CSS AYARLARI */
+        :root {
+            --bg-main: #0d1117; --bg-dark: #161b22; --bg-panel: #21262d;
+            --blue-light: #58a6ff; --blue-dark: #1f6feb;
+            --text-main: #c9d1d9; --text-muted: #8b949e;
+            --success: #2ea043; --danger: #f85149; --warning: #d29922;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; }
+        body { background-color: var(--bg-main); color: var(--text-main); height: 100vh; overflow: hidden; display: flex; }
+
+        /* BİLDİRİMLER */
+        #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
+        .toast { background: var(--bg-dark); border-left: 4px solid var(--blue-light); color: white; padding: 15px 20px; border-radius: 4px; box-shadow: 0 5px 15px rgba(0,0,0,0.8); transform: translateX(120%); transition: transform 0.3s; }
+        .toast.show { transform: translateX(0); }
+        .toast.error { border-left-color: var(--danger); }
+        .toast.success { border-left-color: var(--success); }
+        .toast.warning { border-left-color: var(--warning); }
+
+        /* BUTONLAR VE İNPUTLAR */
+        input, textarea { width: 100%; padding: 12px; background-color: #010409; border: 1px solid #30363d; color: white; border-radius: 6px; outline: none; margin-bottom: 15px; resize: none; }
+        input:focus, textarea:focus { border-color: var(--blue-light); }
+        .btn { padding: 12px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; color: white; width: 100%; text-transform: uppercase; letter-spacing: 1px; display: block; margin-top: 5px; }
+        .btn-blue { background: var(--blue-dark); }
+        .btn-blue:hover { background: var(--blue-light); }
+        .btn-green { background: var(--success); }
+        .btn-green:hover { filter: brightness(1.2); }
+        .btn-red { background: var(--danger); }
+        .btn-red:hover { filter: brightness(1.2); }
+
+        /* GİRİŞ EKRANI */
+        #auth-screen { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; background: radial-gradient(circle at center, #161b22 0%, var(--bg-main) 100%); position: absolute; z-index: 100; transition: opacity 0.5s; }
+        .auth-box { background: var(--bg-dark); padding: 40px; border-radius: 12px; width: 400px; box-shadow: 0 15px 40px rgba(0,0,0,0.8); border: 1px solid #30363d; }
+        .auth-box h2 { text-align: center; color: white; margin-bottom: 10px; letter-spacing: 2px; }
+        .auth-box p { text-align: center; color: var(--warning); font-size: 12px; margin-bottom: 25px; font-weight: bold; }
+
+        /* ANA EKRAN DÜZENİ */
+        #app-screen { display: none; width: 100%; height: 100%; }
+        
+        /* SOL MENÜ (KAPANABİLİR) */
+        aside { width: 280px; background-color: var(--bg-dark); display: flex; flex-direction: column; border-right: 1px solid #30363d; transition: margin-left 0.3s ease; flex-shrink: 0; }
+        aside.collapsed { margin-left: -280px; } /* Menüyü gizleyen sınıf */
+        
+        .brand { padding: 30px 20px; text-align: center; border-bottom: 1px solid #30363d; }
+        .brand h1 { color: white; font-size: 24px; letter-spacing: 2px; }
+        .brand span { color: var(--danger); font-size: 12px; font-weight: bold; }
+        
+        .nav-menu { flex: 1; padding: 20px 0; overflow-y: auto; }
+        .nav-item { padding: 15px 30px; color: var(--text-muted); font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .nav-item:hover { color: white; background: rgba(255,255,255,0.05); }
+        .nav-item.active { color: white; background: rgba(88, 166, 255, 0.1); border-left: 4px solid var(--blue-light); }
+        
+        .user-profile { padding: 20px; border-top: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center; }
+        .admin-badge { background: var(--danger); color: white; font-size: 10px; padding: 2px 6px; border-radius: 4px; vertical-align: middle; margin-left: 5px; display: none; }
+
+        /* SAĞ İÇERİK */
+        main { flex: 1; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+        
+        /* ÜST BAR (Toggle Butonu İçin) */
+        .top-bar { background: var(--bg-dark); padding: 15px 25px; border-bottom: 1px solid #30363d; display: flex; align-items: center; }
+        .menu-toggle-btn { background: transparent; border: none; color: white; font-size: 24px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 6px; }
+        .menu-toggle-btn:hover { background: #30363d; color: var(--blue-light); }
+        .top-bar-title { margin-left: 15px; font-size: 18px; font-weight: bold; color: var(--text-muted); }
+
+        .content-area { padding: 40px; overflow-y: auto; flex: 1; }
+        .tab-content { display: none; animation: fadeIn 0.4s ease; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .header-title { color: white; font-size: 32px; margin-bottom: 30px; font-weight: bold; border-bottom: 1px solid #30363d; padding-bottom: 10px; }
+
+        /* DOSYA KARTLARI */
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+        .file-card { background: var(--bg-panel); border-radius: 12px; padding: 25px; display: flex; flex-direction: column; gap: 8px; border: 1px solid #30363d; box-shadow: 0 5px 15px rgba(0,0,0,0.5); transition: 0.3s; position: relative; overflow: hidden; }
+        .file-card:hover { transform: translateY(-5px); border-color: var(--blue-light); box-shadow: 0 10px 30px rgba(88, 166, 255, 0.1); }
+        .file-icon { font-size: 50px; text-align: center; margin-bottom: 5px; }
+        .file-size-badge { position: absolute; top: 15px; right: 15px; background: var(--danger); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+        .file-title { color: white; font-size: 20px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
+        .file-desc { color: var(--text-muted); font-size: 14px; text-align: center; height: 40px; overflow: hidden; }
+        .file-uploader { font-size: 12px; color: var(--blue-light); text-align: center; margin-bottom: 5px; font-weight: bold; }
+
+        /* DOSYA YÜKLEME ALANI */
+        .upload-box { background: #010409; padding: 40px; border-radius: 12px; border: 2px dashed #30363d; text-align: center; margin-bottom: 20px; transition: 0.3s; }
+        .upload-box:hover { border-color: var(--success); }
+        input[type="file"] { display: none; }
+        .custom-file-upload { display: inline-block; padding: 15px 30px; cursor: pointer; background: var(--bg-panel); color: white; border-radius: 6px; border: 1px solid #30363d; transition: 0.2s; font-weight: bold; font-size: 16px; }
+        .custom-file-upload:hover { background: var(--success); color: white; border-color: var(--success); }
+        #selected-file-info { margin-top: 15px; color: var(--blue-light); font-weight: bold; font-size: 16px; }
+        
+        /* Yükleme Ekranı Örtüsü */
+        #loading-overlay { display: none; position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.8); z-index: 50; justify-content: center; align-items: center; flex-direction: column; }
+        .spinner { border: 5px solid #30363d; border-top: 5px solid var(--success); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 15px;}
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div id="toast-container"></div>
+
+    <div id="auth-screen">
+        <div class="auth-box">
+            <h2>DIYAR MASSIVE</h2>
+            <p>SINIRSIZ AĞ - YÖNETİM SÜREKLİ AKTİF</p>
+            <input type="text" id="username" placeholder="Kullanıcı Adı" autocomplete="off">
+            <input type="password" id="password" placeholder="Şifre">
+            <button class="btn btn-blue" onclick="handleAuth('login')" style="margin-bottom: 10px;">Ağa Bağlan</button>
+            <button class="btn" style="background: #21262d; border: 1px solid #30363d;" onclick="handleAuth('register')">Sisteme Kaydol</button>
+        </div>
+    </div>
+
+    <div id="app-screen">
+        <aside id="sidebar">
+            <div class="brand">
+                <h1>DIYAR</h1>
+                <span>MASSIVE NETWORK</span>
+            </div>
+            <div class="nav-menu">
+                <div class="nav-item active" onclick="switchTab('tab-store', this)">🌐 Küresel Mağaza</div>
+                <div class="nav-item" onclick="switchTab('tab-upload', this)">📤 Dev Dosya Yükle</div>
+                <div class="nav-item" onclick="switchTab('tab-myfiles', this)">📥 Kütüphanem</div>
+            </div>
+            <div class="user-profile">
+                <div>
+                    <div style="color: white; font-weight: bold; font-size: 18px;">
+                        <span id="display-name">Kullanıcı</span>
+                        <span class="admin-badge" id="admin-badge">ADMİN</span>
+                    </div>
+                    <div style="font-size: 12px; color: var(--success);" id="connection-status">● Sunucuya Bağlı</div>
+                </div>
+                <button onclick="logout()" style="background:transparent; border:1px solid var(--danger); color:var(--danger); padding:8px 15px; border-radius:6px; cursor:pointer; font-weight:bold;">Çıkış</button>
+            </div>
+        </aside>
+
+        <main>
+            <div class="top-bar">
+                <button class="menu-toggle-btn" onclick="toggleMenu()" title="Menüyü Aç/Kapat">☰</button>
+                <span class="top-bar-title" id="current-tab-title">Küresel Mağaza</span>
+            </div>
+
+            <div id="loading-overlay">
+                <div class="spinner"></div>
+                <h2 style="color:white;" id="loading-text">İşlem Yapılıyor... Lütfen Bekleyin.</h2>
+            </div>
+
+            <div class="content-area">
+                <div id="tab-store" class="tab-content active">
+                    <h2 class="header-title">Ağdaki Tüm Dosyalar</h2>
+                    <div class="grid" id="store-grid"></div>
+                </div>
+
+                <div id="tab-upload" class="tab-content">
+                    <h2 class="header-title">Ağa Yeni Dosya Ekle (.exe, .zip, .mp4)</h2>
+                    <div style="max-width: 800px;">
+                        <input type="text" id="upload-title" placeholder="Dosya Başlığı (Örn: GTA San Andreas Kurulum)" style="font-size: 18px;">
+                        <textarea id="upload-desc" rows="3" placeholder="Bu dosyanın içinde ne var?"></textarea>
+                        
+                        <div class="upload-box">
+                            <label class="custom-file-upload">
+                                <input type="file" id="file-input" onchange="fileSelected()">
+                                Bilgisayardan Dosya Seç (Sınır Yok)
+                            </label>
+                            <div id="selected-file-info">Henüz dosya seçilmedi.</div>
+                        </div>
+
+                        <button class="btn btn-green" style="font-size: 18px; padding: 15px;" onclick="uploadFile()">🚀 AĞA YÜKLE</button>
+                    </div>
+                </div>
+
+                <div id="tab-myfiles" class="tab-content">
+                    <h2 class="header-title">Kütüphanem (İndirmeye Hazır)</h2>
+                    <div class="grid" id="myfiles-grid"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // --- MENÜ AÇ/KAPA FONKSİYONU ---
+        function toggleMenu() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('collapsed');
+        }
+
+        // --- 1. SÜPER GÜÇ: IndexedDB (GB'LARCA VERİ İÇİN) ---
+        let massiveDB;
+        const dbName = "DiyarMassiveNetworkDB";
+
+        function initIndexedDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(dbName, 1);
+                request.onupgradeneeded = (event) => {
+                    let db = event.target.result;
+                    if (!db.objectStoreNames.contains('files')) db.createObjectStore('files'); 
+                };
+                request.onsuccess = (event) => { massiveDB = event.target.result; resolve(); };
+                request.onerror = (event) => { reject(event.target.error); };
+            });
+        }
+
+        function saveMassiveFileToDisk(fileId, fileObject) {
+            return new Promise((resolve, reject) => {
+                const transaction = massiveDB.transaction(['files'], 'readwrite');
+                const store = transaction.objectStore('files');
+                const request = store.put(fileObject, fileId);
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        function getMassiveFileFromDisk(fileId) {
+            return new Promise((resolve, reject) => {
+                const transaction = massiveDB.transaction(['files'], 'readonly');
+                const store = transaction.objectStore('files');
+                const request = store.get(fileId);
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        function deleteMassiveFileFromDisk(fileId) {
+            return new Promise((resolve, reject) => {
+                const transaction = massiveDB.transaction(['files'], 'readwrite');
+                const store = transaction.objectStore('files');
+                const request = store.delete(fileId);
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        // --- 2. METADATA (İSİMLER VE KULLANICILAR) ---
+        let dbMeta = JSON.parse(localStorage.getItem('diyarNetworkMeta')) || { users: {}, storeFiles: [] };
+        let currentUser = null;
+        let isAdmin = false;
+        let selectedFile = null; 
+
+        function saveMetaDB() { localStorage.setItem('diyarNetworkMeta', JSON.stringify(dbMeta)); }
+
+        function showToast(message, type = 'normal') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerText = message;
+            container.appendChild(toast);
+            setTimeout(() => toast.classList.add('show'), 10);
+            setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 3000);
+        }
+
+        window.onload = async () => {
+            try { await initIndexedDB(); } 
+            catch (error) { showToast("Tarayıcın Sınırsız Depolamayı desteklemiyor!", "error"); }
+        };
+
+        // --- GİRİŞ VE ADMİN KONTROLÜ ---
+        function handleAuth(action) {
+            const name = document.getElementById('username').value.trim();
+            const pass = document.getElementById('password').value;
+
+            if (!name || !pass) return showToast("Alanları boş bırakma kanka!", "error");
+
+            if (action === 'register') {
+                if(name === 'ceusx') return showToast("Bu sistem adı rezerve edilmiştir!", "error");
+                if (dbMeta.users[name]) return showToast("Bu isim alınmış.", "error");
+                
+                dbMeta.users[name] = { password: pass, myLibrary: [] };
+                saveMetaDB();
+                showToast("Hesap açıldı! Şimdi giriş yap.", "success");
+            } else {
+                if (name === 'ceusx' && pass === 'ceusx1213') {
+                    if (!dbMeta.users['ceusx']) {
+                        dbMeta.users['ceusx'] = { password: 'ceusx1213', myLibrary: [] };
+                        saveMetaDB();
+                    }
+                    currentUser = name;
+                    isAdmin = true;
+                    initApp();
+                } 
+                else if (dbMeta.users[name] && dbMeta.users[name].password === pass) {
+                    currentUser = name;
+                    isAdmin = false;
+                    initApp();
+                } else {
+                    showToast("Şifre veya isim yanlış!", "error");
+                }
+            }
+        }
+
+        function logout() {
+            document.getElementById('auth-screen').style.opacity = '1';
+            document.getElementById('auth-screen').style.zIndex = '100';
+            document.getElementById('app-screen').style.display = 'none';
+            currentUser = null;
+            isAdmin = false;
+            selectedFile = null;
+            document.getElementById('selected-file-info').innerText = "Henüz dosya seçilmedi.";
+        }
+
+        function initApp() {
+            document.getElementById('auth-screen').style.opacity = '0';
+            setTimeout(() => {
+                document.getElementById('auth-screen').style.zIndex = '-1';
+                document.getElementById('app-screen').style.display = 'flex';
+            }, 500);
+
+            document.getElementById('display-name').innerText = currentUser;
+            
+            if(isAdmin) {
+                document.getElementById('admin-badge').style.display = 'inline-block';
+                document.getElementById('connection-status').innerText = '🛡️ Yönetici Paneli Aktif';
+                document.getElementById('connection-status').style.color = 'var(--danger)';
+            } else {
+                document.getElementById('admin-badge').style.display = 'none';
+                document.getElementById('connection-status').innerText = '● Sunucuya Bağlı';
+                document.getElementById('connection-status').style.color = 'var(--success)';
+            }
+
+            renderStore();
+            renderMyFiles();
+            document.querySelector('.nav-item').click();
+        }
+
+        function switchTab(tabId, element) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            element.classList.add('active');
+            
+            // Üst bar başlığını güncelle
+            document.getElementById('current-tab-title').innerText = element.innerText;
+        }
+
+        // --- DOSYA İŞLEMLERİ ---
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024; const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function getFileIcon(fileName) {
+            if(fileName.endsWith('.exe')) return '⚙️';
+            if(fileName.endsWith('.rar') || fileName.endsWith('.zip') || fileName.endsWith('.7z')) return '🗜️';
+            if(fileName.endsWith('.mp4') || fileName.endsWith('.avi') || fileName.endsWith('.mkv')) return '🎬';
+            if(fileName.endsWith('.png') || fileName.endsWith('.jpg')) return '🖼️';
+            return '📄';
+        }
+
+        function fileSelected() {
+            const fileInput = document.getElementById('file-input');
+            selectedFile = fileInput.files[0]; 
+            if(!selectedFile) return;
+            
+            const sizeStr = formatBytes(selectedFile.size);
+            document.getElementById('selected-file-info').innerText = `Hazır: ${selectedFile.name} | Boyut: ${sizeStr}`;
+        }
+
+        async function uploadFile() {
+            const title = document.getElementById('upload-title').value.trim();
+            const desc = document.getElementById('upload-desc').value.trim();
+
+            if(!title) return showToast("Bir başlık yazmalısın!", "error");
+            if(!selectedFile) return showToast("Kanka dosya seçmedin!", "error");
+
+            document.getElementById('loading-overlay').style.display = 'flex';
+            
+            try {
+                const fileId = "FILE_" + Date.now().toString();
+                
+                await saveMassiveFileToDisk(fileId, selectedFile);
+
+                const newFileMeta = {
+                    id: fileId,
+                    title: title,
+                    description: desc || "Açıklama girilmemiş.",
+                    uploader: currentUser,
+                    fileName: selectedFile.name,
+                    fileSize: formatBytes(selectedFile.size),
+                    icon: getFileIcon(selectedFile.name)
+                };
+
+                dbMeta.storeFiles.push(newFileMeta);
+                
+                if(!dbMeta.users[currentUser].myLibrary.includes(fileId)) {
+                    dbMeta.users[currentUser].myLibrary.push(fileId);
+                }
+
+                saveMetaDB(); 
+
+                showToast(`${selectedFile.name} ağa başarıyla gömüldü!`, "success");
+
+                document.getElementById('upload-title').value = '';
+                document.getElementById('upload-desc').value = '';
+                document.getElementById('file-input').value = '';
+                document.getElementById('selected-file-info').innerText = "Henüz dosya seçilmedi.";
+                selectedFile = null;
+
+                renderStore();
+                renderMyFiles();
+                document.querySelector('.nav-item').click(); 
+
+            } catch (error) {
+                showToast("Dosya kaydedilirken hata: " + error, "error");
+            } finally {
+                document.getElementById('loading-overlay').style.display = 'none';
+            }
+        }
+
+        function renderStore() {
+            const grid = document.getElementById('store-grid');
+            grid.innerHTML = '';
+
+            if(dbMeta.storeFiles.length === 0) {
+                grid.innerHTML = '<p style="color:var(--text-muted); grid-column: 1/-1;">Ağda hiç dosya yok. Sistem bomboş.</p>';
+                return;
+            }
+
+            dbMeta.storeFiles.forEach(file => {
+                const isOwned = dbMeta.users[currentUser].myLibrary.includes(file.id);
+                
+                grid.innerHTML += `
+                    <div class="file-card">
+                        <div class="file-size-badge">${file.fileSize}</div>
+                        <div class="file-icon">${file.icon}</div>
+                        <div class="file-title" title="${file.title}">${file.title}</div>
+                        <div class="file-uploader">Yükleyen: ${file.uploader}</div>
+                        <div class="file-desc">${file.description}</div>
+                        <div style="font-size:11px; color:#8f98a0; text-align:center; margin-bottom:5px; background:#010409; padding:5px; border-radius:4px;">${file.fileName}</div>
+                        
+                        ${isOwned 
+                            ? `<button class="btn btn-green" onclick="downloadMassiveFile('${file.id}', '${file.fileName}')">⬇️ PC'YE İNDİR</button>`
+                            : `<button class="btn btn-blue" onclick="addToLibrary('${file.id}')">➕ KÜTÜPHANEYE AL</button>`
+                        }
+                        
+                        ${isAdmin ? `<button class="btn btn-red" onclick="deleteFromNetwork('${file.id}')">🗑️ AĞDAN SİL (ADMİN)</button>` : ''}
+                    </div>
+                `;
+            });
+        }
+
+        function addToLibrary(fileId) {
+            if(!dbMeta.users[currentUser].myLibrary.includes(fileId)) {
+                dbMeta.users[currentUser].myLibrary.push(fileId);
+                saveMetaDB();
+                showToast("Dosya kütüphanene eklendi!", "success");
+                renderStore();
+                renderMyFiles();
+            }
+        }
+
+        function removeFromLibrary(fileId) {
+            dbMeta.users[currentUser].myLibrary = dbMeta.users[currentUser].myLibrary.filter(id => id !== fileId);
+            saveMetaDB();
+            showToast("Dosya kütüphanenden kaldırıldı.", "warning");
+            renderStore();
+            renderMyFiles();
+        }
+
+        async function deleteFromNetwork(fileId) {
+            if(!confirm("DİKKAT! Bu dosyayı tüm ağdan ve harddiskten kalıcı olarak silmek istediğine emin misin?")) return;
+            
+            document.getElementById('loading-overlay').style.display = 'flex';
+            
+            try {
+                dbMeta.storeFiles = dbMeta.storeFiles.filter(f => f.id !== fileId);
+                
+                for(let user in dbMeta.users) {
+                    dbMeta.users[user].myLibrary = dbMeta.users[user].myLibrary.filter(id => id !== fileId);
+                }
+                saveMetaDB();
+
+                await deleteMassiveFileFromDisk(fileId);
+
+                showToast("Dosya sistemden tamamen imha edildi!", "success");
+                renderStore();
+                renderMyFiles();
+            } catch (error) {
+                showToast("Dosya silinirken hata oluştu!", "error");
+            } finally {
+                document.getElementById('loading-overlay').style.display = 'none';
+            }
+        }
+
+        function renderMyFiles() {
+            const grid = document.getElementById('myfiles-grid');
+            grid.innerHTML = '';
+            
+            const myLibraryIds = dbMeta.users[currentUser].myLibrary;
+            const myFiles = dbMeta.storeFiles.filter(f => myLibraryIds.includes(f.id));
+
+            if(myFiles.length === 0) {
+                grid.innerHTML = '<p style="color:var(--text-muted); grid-column: 1/-1;">Kütüphanen boş. Mağazadan bir şeyler kap!</p>';
+                return;
+            }
+
+            myFiles.forEach(file => {
+                grid.innerHTML += `
+                    <div class="file-card" style="border-color: var(--success);">
+                        <div class="file-size-badge" style="background:var(--blue-dark);">${file.fileSize}</div>
+                        <div class="file-icon">${file.icon}</div>
+                        <div class="file-title" title="${file.title}">${file.title}</div>
+                        <div class="file-uploader">Yükleyen: ${file.uploader}</div>
+                        <div style="font-size:11px; color:#8f98a0; text-align:center; margin-bottom:5px; background:#010409; padding:5px; border-radius:4px;">${file.fileName}</div>
+                        
+                        <button class="btn btn-green" onclick="downloadMassiveFile('${file.id}', '${file.fileName}')">⬇️ PC'YE İNDİR</button>
+                        <button class="btn btn-red" onclick="removeFromLibrary('${file.id}')">🗑️ KÜTÜPHANEDEN KALDIR</button>
+                    </div>
+                `;
+            });
+        }
+
+        async function downloadMassiveFile(fileId, fileName) {
+            try {
+                showToast("Disk'ten okunuyor, indirme başlıyor...", "warning");
+                const fileBlob = await getMassiveFileFromDisk(fileId);
+                
+                if (!fileBlob) {
+                    return showToast("Dosya diskte bulunamadı! Yönetici tarafından silinmiş olabilir.", "error");
+                }
+
+                const downloadUrl = URL.createObjectURL(fileBlob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = downloadUrl;
+                a.download = fileName; 
+                document.body.appendChild(a);
+                a.click();
+                
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(downloadUrl);
+                    showToast(`${fileName} başarıyla indirildi!`, "success");
+                }, 1000);
+
+            } catch (error) {
+                showToast("İndirme hatası: " + error, "error");
+            }
+        }
+    </script>
+</body>
+</html>
